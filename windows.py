@@ -10,6 +10,7 @@ import threading
 import time
 import webbrowser
 import pystray
+import pyperclip
 import asyncio as _asyncio
 import customtkinter as ctk
 from pathlib import Path
@@ -42,13 +43,27 @@ _exiting: bool = False
 log = logging.getLogger("tg-ws-tray")
 
 
-def is_already_running():
-    current_proc = os.path.basename(sys.argv[0])
-    count = 0
-    for process in psutil.process_iter(['name']):
-        if process.info['name'] == current_proc:
-            count += 1
-    return count > 2
+def _acquire_lock() -> bool:
+    _ensure_dirs()
+    lock_files = list(APP_DIR.glob("*.lock"))
+        
+    for f in lock_files:
+        try:
+            pid = int(f.stem)
+            if psutil.pid_exists(pid):
+                try:
+                    psutil.Process(pid).status()
+                    return False
+                except (psutil.NoSuchProcess, psutil.ZombieProcess):
+                    pass
+        except Exception:
+            pass
+
+        f.unlink(missing_ok=True)
+
+    lock_file = APP_DIR / f"{os.getpid()}.lock"
+    lock_file.touch()
+    return True
 
 
 def _ensure_dirs():
@@ -148,6 +163,8 @@ def _run_proxy_thread(port: int, dc_opt: Dict[int, str], verbose: bool):
             tg_ws_proxy._run(port, dc_opt, stop_event=stop_ev))
     except Exception as exc:
         log.error("Proxy thread crashed: %s", exc)
+        if "10048" in str(exc) or "Address already in use" in str(exc):
+            _show_error("Не удалось запустить прокси:\nПорт уже используется другим приложением.\n\nЗакройте приложение, использующее этот порт, или измените порт в настройках прокси и перезапустите.")
     finally:
         loop.close()
         _async_stop = None
@@ -216,7 +233,7 @@ def _on_open_in_telegram(icon=None, item=None):
     except Exception:
         log.info("Browser open failed, copying to clipboard")
         try:
-            _copy_to_clipboard(url)
+            pyperclip.copy(url)
             _show_info(
                 f"Не удалось открыть Telegram автоматически.\n\n"
                 f"Ссылка скопирована в буфер обмена, отправьте её в телеграмм и нажмите по ней ЛКМ:\n{url}",
@@ -226,31 +243,11 @@ def _on_open_in_telegram(icon=None, item=None):
             _show_error(f"Не удалось скопировать ссылку:\n{exc}")
 
 
-def _copy_to_clipboard(text: str):
-    """Copy text to Windows clipboard using ctypes."""
-    import ctypes.wintypes
-    CF_UNICODETEXT = 13
-    kernel32 = ctypes.windll.kernel32
-    user32 = ctypes.windll.user32
-
-    user32.OpenClipboard(0)
-    user32.EmptyClipboard()
-
-    encoded = text.encode("utf-16-le") + b"\x00\x00"
-    h = kernel32.GlobalAlloc(0x0042, len(encoded))  # GMEM_MOVEABLE | GMEM_ZEROINIT
-    p = kernel32.GlobalLock(h)
-    ctypes.memmove(p, encoded, len(encoded))
-    kernel32.GlobalUnlock(h)
-    user32.SetClipboardData(CF_UNICODETEXT, h)
-    user32.CloseClipboard()
-
-
 def _on_restart(icon=None, item=None):
     threading.Thread(target=restart_proxy, daemon=True).start()
 
 
 def _on_edit_config(icon=None, item=None):
-    """Open a simple dialog to edit config."""
     threading.Thread(target=_edit_config_dialog, daemon=True).start()
 
 
@@ -571,7 +568,7 @@ def run_tray():
 
 
 def main():
-    if is_already_running():
+    if not _acquire_lock():
         _show_info("Приложение уже запущено.", os.path.basename(sys.argv[0]))
         return
 

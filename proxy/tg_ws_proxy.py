@@ -596,7 +596,7 @@ async def _handle_client(reader, writer):
                 rr, rw = await asyncio.wait_for(
                     asyncio.open_connection(dst, port), timeout=10)
             except Exception as exc:
-                log.warning("[%s] passthrough failed to %s: %s", label, dst, exc)
+                log.warning("[%s] passthrough failed to %s: %s: %s", label, dst, type(exc).__name__, str(exc) or "(no message)")
                 writer.write(_socks5_reply(0x05))
                 await writer.drain()
                 writer.close()
