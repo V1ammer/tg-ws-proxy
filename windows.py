@@ -22,6 +22,8 @@ from PIL import Image, ImageDraw, ImageFont
 import proxy.tg_ws_proxy as tg_ws_proxy
 
 
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+
 APP_NAME = "TgWsProxy"
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / APP_NAME
 CONFIG_FILE = APP_DIR / "config.json"
@@ -171,9 +173,12 @@ def _autostart_reg_name() -> str:
     return APP_NAME
 
 
+def _supports_autostart() -> bool:
+    return IS_FROZEN
+
+
 def _autostart_command() -> str:
-    exe = sys.executable
-    return f'"{exe}"'
+    return f'"{sys.executable}"'
 
 
 def is_autostart_enabled() -> bool:
@@ -364,6 +369,12 @@ def _edit_config_dialog():
         return
 
     cfg = dict(_config)
+    cfg["autostart"] = is_autostart_enabled()
+
+    # Make sure that the autostart key is removed if autostart 
+    # is disabled, even if the executable file is moved.
+    if _supports_autostart() and not cfg["autostart"]:
+        set_autostart_enabled(False)
 
     ctk.set_appearance_mode("light")
     ctk.set_default_color_theme("blue")
@@ -384,7 +395,11 @@ def _edit_config_dialog():
     TEXT_SECONDARY = "#707579"
     FONT_FAMILY = "Segoe UI"
 
-    w, h = 420, 520
+    w, h = 420, 460
+
+    if _supports_autostart(): 
+        h += 70
+
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
     root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
@@ -435,19 +450,18 @@ def _edit_config_dialog():
                     corner_radius=6, border_width=2,
                     border_color=FIELD_BORDER).pack(anchor="w", pady=(0, 8))
 
-    # Autostart
-    autostart_var = ctk.BooleanVar(value=cfg.get("autostart", False))
-    ctk.CTkCheckBox(frame, text="Автозапуск при включении Windows",
-                    variable=autostart_var, font=(FONT_FAMILY, 13),
-                    text_color=TEXT_PRIMARY,
-                    fg_color=TG_BLUE, hover_color=TG_BLUE_HOVER,
-                    corner_radius=6, border_width=2,
-                    border_color=FIELD_BORDER).pack(anchor="w", pady=(0, 8))
-
-    # Info label
-    ctk.CTkLabel(frame, text="Изменения вступят в силу после перезапуска прокси.",
-                 font=(FONT_FAMILY, 11), text_color=TEXT_SECONDARY,
-                 anchor="w").pack(anchor="w", pady=(0, 16))
+    autostart_var = None
+    if _supports_autostart():
+        autostart_var = ctk.BooleanVar(value=cfg["autostart"])
+        ctk.CTkCheckBox(frame, text="Автозапуск при включении Windows",
+                        variable=autostart_var, font=(FONT_FAMILY, 13),
+                        text_color=TEXT_PRIMARY,
+                        fg_color=TG_BLUE, hover_color=TG_BLUE_HOVER,
+                        corner_radius=6, border_width=2,
+                        border_color=FIELD_BORDER).pack(anchor="w", pady=(0, 8))
+        ctk.CTkLabel(frame, text="При перемещении файла или открытии из другой папки\nавтозапуск будет сброшен",
+                 font=(FONT_FAMILY, 13), text_color=TEXT_SECONDARY,
+                 anchor="w", justify="left").pack(anchor="w", pady=(0, 8))
 
     def on_save():
         import socket as _sock
@@ -479,13 +493,14 @@ def _edit_config_dialog():
             "port": port_val,
             "dc_ip": lines,
             "verbose": verbose_var.get(),
-            "autostart": autostart_var.get(),
+            "autostart": (autostart_var.get() if autostart_var is not None else False),
         }
         save_config(new_cfg)
         _config.update(new_cfg)
         log.info("Config saved: %s", new_cfg)
 
-        set_autostart_enabled(bool(new_cfg.get("autostart", False)))
+        if _supports_autostart():
+            set_autostart_enabled(bool(new_cfg.get("autostart", False)))
 
         _tray_icon.menu = _build_menu()
 
@@ -503,18 +518,18 @@ def _edit_config_dialog():
         root.destroy()
 
     btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
-    btn_frame.pack(fill="x")
-    ctk.CTkButton(btn_frame, text="Сохранить", width=140, height=38,
+    btn_frame.pack(fill="x", pady=(20, 0))
+    ctk.CTkButton(btn_frame, text="Сохранить", height=38,
                   font=(FONT_FAMILY, 14, "bold"), corner_radius=10,
                   fg_color=TG_BLUE, hover_color=TG_BLUE_HOVER,
                   text_color="#ffffff",
-                  command=on_save).pack(side="left", padx=(0, 10))
-    ctk.CTkButton(btn_frame, text="Отмена", width=140, height=38,
+                  command=on_save).pack(side="left", fill="x", expand=True, padx=(0, 8))
+    ctk.CTkButton(btn_frame, text="Отмена", height=38,
                   font=(FONT_FAMILY, 14), corner_radius=10,
                   fg_color=FIELD_BG, hover_color=FIELD_BORDER,
                   text_color=TEXT_PRIMARY, border_width=1,
                   border_color=FIELD_BORDER,
-                  command=on_cancel).pack(side="left")
+                  command=on_cancel).pack(side="right", fill="x", expand=True)
 
     root.mainloop()
 
@@ -729,8 +744,6 @@ def run_tray():
     log.info("TG WS Proxy tray app starting")
     log.info("Config: %s", _config)
     log.info("Log file: %s", LOG_FILE)
-
-    set_autostart_enabled(bool(_config.get("autostart", False)))
 
     if pystray is None or Image is None:
         log.error("pystray or Pillow not installed; "
