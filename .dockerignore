@@ -12,12 +12,6 @@ __pycache__/
 venv/
 dist/
 build/
-packaging/
-windows.py
-icon.ico
-*.spec
-*.spec.bak
-*.manifest
 *.log
 .vscode/
 .idea/
