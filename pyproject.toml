@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.25.0"]
+requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +7,7 @@ name = "tg-ws-proxy"
 dynamic=["version"]
 
 description = "Telegram Desktop WebSocket Bridge Proxy"
-readme = "docs/README.md"
+readme = "README.md"
 requires-python = ">=3.8"
 
 license = { name = "MIT", file = "LICENSE" }
