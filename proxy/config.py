@@ -58,6 +58,7 @@ class ProxyConfig:
     fallback_cfproxy: bool = True
     fallback_cfproxy_priority: bool = True
     cfproxy_user_domain: str = ""
+    cfproxy_user_domain_tls_verify: bool = True
     cfproxy_domains: List[str] = field(
         default_factory=lambda: list(CFPROXY_DEFAULT_DOMAINS)
     )
