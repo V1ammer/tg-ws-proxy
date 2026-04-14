@@ -12,8 +12,7 @@ from urllib.request import Request, urlopen
 log = logging.getLogger("tg-mtproto-proxy")
 
 CFPROXY_DOMAINS_URL = (
-    "https://raw.githubusercontent.com/V1ammer/tg-ws-proxy/main"
-    "/.github/cfproxy-domains.txt"
+    "https://raw.githubusercontent.com/V1ammer/tg-ws-proxy/main/cfproxy-domains.txt"
 )
 
 _CFPROXY_ENC: List[str] = [
