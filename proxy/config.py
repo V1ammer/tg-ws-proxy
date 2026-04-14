@@ -26,7 +26,6 @@ _S = "".join(chr(c) for c in (46, 99, 111, 46, 117, 107))
 
 
 def _dd(s: str) -> str:
-    """Only for decoding CF proxy domains"""
     if not s[-4:] == ".com":
         return s
     p, n = s[:-4], sum(c.isalpha() for c in s[:-4])
