@@ -33,7 +33,7 @@
 
           meta = with pkgs.lib; {
             description = "Telegram MTProto WebSocket bridge proxy";
-            homepage = "https://github.com/Flowseal/tg-ws-proxy";
+            homepage = "https://github.com/V1ammer/tg-ws-proxy";
             license = licenses.mit;
             mainProgram = "tg-ws-proxy";
             platforms = platforms.linux ++ platforms.darwin;
